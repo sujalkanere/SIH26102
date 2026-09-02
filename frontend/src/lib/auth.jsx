@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { api, readTokens, writeTokens } from './api'
+import { api, onSessionEnded, readTokens, writeTokens } from './api'
 
 // Mirrors the backend permission matrix (FR-AAA-002) so the UI can hide what
 // the API would refuse anyway.
@@ -41,6 +41,10 @@ export function AuthProvider({ children }) {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  // When a refresh fails the API layer ends the session; drop the user back to
+  // the login screen instead of leaving a shell full of failing panels.
+  useEffect(() => onSessionEnded(() => setUser(null)), [])
 
   const login = useCallback(async (username, password) => {
     const result = await api.login(username, password)

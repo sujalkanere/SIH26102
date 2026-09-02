@@ -38,19 +38,75 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { method = 'GET', body, raw = false, isForm = false } = {}) {
-  const tokens = readTokens()
-  const headers = {}
-  if (tokens?.access_token) headers.Authorization = `Bearer ${tokens.access_token}`
-  if (body && !isForm) headers['Content-Type'] = 'application/json'
+// Listeners are notified when the session ends for good, so the UI can fall
+// back to the login screen instead of leaving dead panels on the page.
+const sessionEndedListeners = new Set()
 
-  const response = await fetch(`${BASE}${path}`, {
+export function onSessionEnded(listener) {
+  sessionEndedListeners.add(listener)
+  return () => sessionEndedListeners.delete(listener)
+}
+
+function endSession() {
+  writeTokens(null)
+  sessionEndedListeners.forEach((listener) => listener())
+}
+
+// Retrying these would be pointless or circular: they are how a session is
+// established in the first place.
+const NON_RENEWABLE_PATHS = ['/auth/login', '/auth/refresh']
+
+// Access tokens live 30 minutes while refresh tokens live 7 days, so an idle
+// tab must renew rather than dump the user back at the login screen. All
+// concurrent 401s share one in-flight refresh instead of stampeding the API.
+let refreshInFlight = null
+
+function refreshAccessToken() {
+  const tokens = readTokens()
+  if (!tokens?.refresh_token) return Promise.resolve(null)
+
+  refreshInFlight ??= fetch(`${BASE}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: tokens.refresh_token }),
+  })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((renewed) => {
+      if (!renewed?.access_token) return null
+      const next = { ...readTokens(), access_token: renewed.access_token }
+      writeTokens(next)
+      return next.access_token
+    })
+    .catch(() => null)
+    .finally(() => {
+      refreshInFlight = null
+    })
+
+  return refreshInFlight
+}
+
+function send(path, accessToken, { method, body, isForm }) {
+  const headers = {}
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+  if (body && !isForm) headers['Content-Type'] = 'application/json'
+  return fetch(`${BASE}${path}`, {
     method,
     headers,
     body: isForm ? body : body ? JSON.stringify(body) : undefined,
   })
+}
 
-  if (response.status === 401) writeTokens(null)
+async function request(path, { method = 'GET', body, raw = false, isForm = false } = {}) {
+  const options = { method, body, isForm }
+  let response = await send(path, readTokens()?.access_token, options)
+
+  // An expired access token is recoverable: renew once, then replay the call.
+  if (response.status === 401 && !NON_RENEWABLE_PATHS.some((p) => path.startsWith(p))) {
+    const renewedToken = await refreshAccessToken()
+    if (renewedToken) response = await send(path, renewedToken, options)
+  }
+
+  if (response.status === 401) endSession()
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}))
     throw new ApiError(response.status, detail.detail || `Request failed (${response.status})`)
