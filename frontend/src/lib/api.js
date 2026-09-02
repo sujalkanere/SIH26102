@@ -2,7 +2,13 @@
 const BASE = '/api/v1'
 const TOKEN_KEY = 'mplads.tokens'
 
-export function readTokens() {
+// Tokens live in memory as the source of truth. localStorage is only a
+// best-effort mirror so a reload can restore the session: inside sandboxed or
+// storage-partitioned iframes it may be unavailable or silently cleared, and
+// the app must keep working regardless.
+let memoryTokens = null
+
+function readStoredTokens() {
   try {
     return JSON.parse(localStorage.getItem(TOKEN_KEY)) || null
   } catch {
@@ -10,9 +16,19 @@ export function readTokens() {
   }
 }
 
+export function readTokens() {
+  if (!memoryTokens) memoryTokens = readStoredTokens()
+  return memoryTokens
+}
+
 export function writeTokens(tokens) {
-  if (tokens) localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens))
-  else localStorage.removeItem(TOKEN_KEY)
+  memoryTokens = tokens
+  try {
+    if (tokens) localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens))
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // Storage unavailable — the in-memory copy still backs the session.
+  }
 }
 
 export class ApiError extends Error {

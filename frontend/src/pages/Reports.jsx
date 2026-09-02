@@ -76,7 +76,7 @@ export default function Reports({ financialYear }) {
               { value: 'CSV', label: 'CSV dataset' },
             ]}
           />
-          <button className="btn-primary" type="submit" disabled={busy}>
+          <button className="btn btn-primary" type="submit" disabled={busy}>
             {busy ? 'Generating…' : '⭳ Generate report'}
           </button>
         </div>

@@ -36,12 +36,12 @@ export default function Admin() {
             <input ref={fileInput} type="file" accept=".csv" />
           </label>
           <button
-            className="btn-primary" type="button" disabled={busy}
+            className="btn btn-primary" type="button" disabled={busy}
             onClick={() => fileInput.current?.files?.[0] && upload.mutate(fileInput.current.files[0])}
           >
             ⭱ Upload CSV
           </button>
-          <button type="button" disabled={busy} onClick={() => detect.mutate()}>
+          <button type="button" className="btn" disabled={busy} onClick={() => detect.mutate()}>
             ⟳ Re-run detection
           </button>
         </div>
@@ -53,18 +53,14 @@ export default function Admin() {
             onChange={(v) => setSynthetic({ ...synthetic, num_works_per_constituency: v })} min={20} max={500} />
           <NumberField label="Anomaly rate" value={synthetic.anomaly_rate} step={0.01} min={0} max={0.5}
             onChange={(v) => setSynthetic({ ...synthetic, anomaly_rate: v })} />
-          <button type="button" disabled={busy} onClick={() => generate.mutate()}>
+          <button type="button" className="btn" disabled={busy} onClick={() => generate.mutate()}>
             ✨ Regenerate synthetic dataset
           </button>
         </div>
 
         {busy && <Loading label="Working — running the detection pipeline…" />}
         <ErrorNote error={upload.error || generate.error || detect.error} />
-        {result && (
-          <pre style={{ background: '#f1f5f9', padding: '0.7rem', borderRadius: 8, fontSize: '0.8rem', overflowX: 'auto' }}>
-            {JSON.stringify(result, null, 2)}
-          </pre>
-        )}
+        {result && <ResultSummary result={result} />}
       </Panel>
 
       <Panel title="Upload History">
@@ -98,6 +94,33 @@ export default function Admin() {
         )}
       </Panel>
     </>
+  )
+}
+
+/** Renders pipeline results as readable stats, with the raw payload tucked away. */
+function ResultSummary({ result }) {
+  const stats = [
+    ['works', 'Works'], ['constituencies', 'Constituencies'],
+    ['fund_releases', 'Fund releases'], ['records_valid', 'Records valid'],
+    ['records_rejected', 'Records rejected'], ['works_analyzed', 'Works analysed'],
+    ['anomalies_detected', 'Anomalies found'],
+  ].filter(([key]) => result[key] !== undefined)
+
+  return (
+    <div style={{ marginTop: '1rem' }}>
+      <div className="stat-row" style={{ marginBottom: '0.9rem' }}>
+        {stats.map(([key, label]) => (
+          <div key={key}>
+            <strong>{formatCount(result[key])}</strong>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+      <details>
+        <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-3)' }}>Raw response</summary>
+        <pre className="code-block" style={{ marginTop: '0.5rem' }}>{JSON.stringify(result, null, 2)}</pre>
+      </details>
+    </div>
   )
 }
 

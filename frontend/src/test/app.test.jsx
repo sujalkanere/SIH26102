@@ -78,8 +78,9 @@ describe('App shell', () => {
   it('offers the SRS seed accounts as one-click demo logins', async () => {
     renderApp()
     await screen.findByRole('heading', { name: 'MPLADS Sentinel' })
-    expect(screen.getByRole('button', { name: 'admin' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'mp_user' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Administrator/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Member of Parliament/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Public Viewer/ })).toBeInTheDocument()
   })
 
   it('renders the national dashboard for an authenticated ministry user', async () => {
@@ -89,7 +90,7 @@ describe('App shell', () => {
     })
     renderApp()
 
-    expect(await screen.findByText('Total Works Analysed')).toBeInTheDocument()
+    expect(await screen.findByText('Works Analysed')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText('739')).toBeInTheDocument())
     expect(screen.getByText('₹ 61.69 Cr')).toBeInTheDocument()
     expect(screen.getByText('State Risk Heatmap')).toBeInTheDocument()
@@ -102,8 +103,8 @@ describe('App shell', () => {
     })
     renderApp()
 
-    await screen.findByText('Total Works Analysed')
-    expect(screen.getByRole('link', { name: 'Alerts' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Administration' })).not.toBeInTheDocument()
+    await screen.findByText('Works Analysed')
+    expect(screen.getByRole('link', { name: /Alert Queue/ })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Administration/ })).not.toBeInTheDocument()
   })
 })
